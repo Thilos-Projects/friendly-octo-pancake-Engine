@@ -1,15 +1,23 @@
 #pragma once
 
 #include "Logger_Import/loguru.hpp"
+#include "EventSystem/EventSystem.h"
+#include "Singletons/baseSingleton.h"
+#include "Singletons/baseSingletonStorrage.h"
+#include "Singletons/baseSingletonFactory.h"
 #include <thread>
 #include <stdexcept>
 
 namespace FrameWork {
 	void logguruTest(int argc, char* argv[]);
 
+	void singletonTest();
+
 	bool testFramework(int argc, char* argv[]) {
 
 		//logguruTest(argc, argv); is ok
+
+		singletonTest();
 
 		return true;
 	}
@@ -51,4 +59,16 @@ namespace FrameWork {
 			throw std::runtime_error(std::string(message.prefix) + message.message);
 			});
 	}
+
+	class testSingletonMapStorrage : public FrameWork_Singletons::baseMapStorrage<int, std::string, testSingletonMapStorrage> {
+
+	};
+
+	void singletonTest() {
+		auto test = testSingletonMapStorrage::getInstance();
+		std::string s0 = "test";
+		testSingletonMapStorrage::getInstance()->addOnId(0, &s0);
+		 testSingletonMapStorrage::getInstance()->getById(0);
+	}
 }
+FrameWork::testSingletonMapStorrage* FrameWork::testSingletonMapStorrage::instance = 0;
