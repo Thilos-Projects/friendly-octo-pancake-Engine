@@ -20,14 +20,14 @@ namespace FrameWork_Singletons {
 	/// template<typename T>
 	/// struct FactoryRegister : Factory {
 	///		FactoryRegister(std::string const& s) {
-	///			getMap()->insert(std::make_pair(s, &createT<T, Component>));
+	///			getMap()->insert(std::make_pair(s, &createT<T, FactoryRegisterType>));
 	///		}
 	///	};
 	/// muss nach der klassen deffinition auch deffiniert werden
 	/// </summary>
 	/// <typeparam name="baseType">basistype der factory</typeparam>
 	template<typename baseType>
-	struct baseFactory : baseSingleton<baseFactory> {
+	struct baseFactory : public baseSingleton<baseFactory> {
 	private:
 		std::map<std::string, baseType* (*)()> map;
 	public:
@@ -46,9 +46,9 @@ namespace FrameWork_Singletons {
 		/// </summary>
 		/// <param name="s">der type name der instance</param>
 		/// <returns>eine instance pointer die mit new erzeugt wird</returns>
-		baseType* createInstance(std::string const& s) { 
-			auto it = map->find(s);
-			if (it == map->end())
+		static baseType* createInstance(std::string const& s) { 
+			auto it = getInstance().map->find(s);
+			if (it == getInstance().map->end())
 				return 0;
 			return it->second();
 		}

@@ -8,7 +8,7 @@
 #include <sstream>
 #include <iostream>
 
-namespace JsonParser {
+namespace FrameWork_JsonParser {
 	/// <summary>
 	/// wandelt einen json string in ein json objekt um das anschlieﬂend ausgelesen werden kann
 	/// </summary>
