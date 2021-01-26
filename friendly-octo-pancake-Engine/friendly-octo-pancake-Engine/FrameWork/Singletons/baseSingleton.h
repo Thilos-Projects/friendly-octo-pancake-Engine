@@ -6,21 +6,29 @@
 
 namespace FrameWork_Singletons {
 
-	//generic Singleton um jeden type als singleton abbilden zu können
+	/// <summary>
+	/// eine abstract warriante eines singletons um alle singletons leichter machen.
+	/// T* T::instance = 0; muss nach der klassen deffinition aufgerufen werden
+	/// </summary>
+	/// <typeparam name="T">der type der classe die ein singleton werden soll</typeparam>
 	template<typename T>
 	class baseSingleton {
 	private:
-		//die interne instance des singletons
+		/// <summary>
+		/// die instance des neuen types
+		/// </summary>
 		static T* instance;
 	public:
-		//der aufruf um die instatnce zu erriechen
+		/// <summary>
+		/// liefert die instanz des singletons
+		/// </summary>
+		/// <returns>die instance des singletons</returns>
 		static T* getInstance() {
 			if (!instance)
 				instance = new T();
 			return instance;
 		}
 	};
-	//	T* T::instance = 0; nach dem erstellen der instance um den singleton zu deffinieren
 }
 
 #endif
