@@ -1,6 +1,7 @@
 #ifndef _BASESINGLETONFACTORY_
 #define _BASESINGLETONFACTORY_
 
+#include "baseSingleton.h"
 #include <map>
 #include <string>
 
@@ -26,10 +27,14 @@ namespace FrameWork_Singletons {
 	/// muss nach der klassen deffinition auch deffiniert werden
 	/// </summary>
 	/// <typeparam name="baseType">basistype der factory</typeparam>
-	template<typename baseType>
-	struct baseFactory : public baseSingleton<baseFactory> {
-	private:
+	template<typename baseType, typename factory>
+	class baseFactory : public baseSingleton<factory> {
+	protected:
 		std::map<std::string, baseType* (*)()> map;
+
+		static std::map<std::string, baseType* (*)()>* getMap() {
+			return &(((baseFactory<baseType, factory>*)baseFactory::getInstance())->map);
+		}
 	public:
 		/// <summary>
 		/// instancing
@@ -47,8 +52,8 @@ namespace FrameWork_Singletons {
 		/// <param name="s">der type name der instance</param>
 		/// <returns>eine instance pointer die mit new erzeugt wird</returns>
 		static baseType* createInstance(std::string const& s) { 
-			auto it = getInstance().map->find(s);
-			if (it == getInstance().map->end())
+			auto it = ((baseFactory<baseType, factory>*)baseFactory::getInstance())->map.find(s);
+			if (it == ((baseFactory<baseType, factory>*)baseFactory::getInstance())->map.end())
 				return 0;
 			return it->second();
 		}

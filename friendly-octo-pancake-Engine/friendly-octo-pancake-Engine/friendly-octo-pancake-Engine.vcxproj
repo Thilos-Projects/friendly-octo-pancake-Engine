@@ -140,14 +140,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="FrameWork\Logger_Import\loguru.cpp" />
-    <ClCompile Include="friendly-octo-pancake-Engine.cpp" />
+    <ClCompile Include="FrameWork\modulLoader\moduleLoader.h" />
+    <ClCompile Include="Quelle.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FrameWork\EntryPoint.h" />
     <ClInclude Include="FrameWork\EventSystem\EventSystem.h" />
+    <ClInclude Include="FrameWork\JsonParser\Json.h" />
     <ClInclude Include="FrameWork\Logger_Import\loguru.hpp" />
     <ClInclude Include="FrameWork\Singletons\baseSingletonFactory.h" />
     <ClInclude Include="FrameWork\Singletons\baseSingleton.h" />
-    <ClInclude Include="FrameWork\Singletons\baseSingletonStorrage.h" />
     <ClInclude Include="FrameWork\Tester.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -13,12 +13,12 @@ namespace FrameWork_Singletons {
 	/// <typeparam name="T">der type der classe die ein singleton werden soll</typeparam>
 	template<typename T>
 	class baseSingleton {
-	public:
+	private:
 		/// <summary>
 		/// die instance des neuen types
 		/// </summary>
 		static T* instance;
-
+	public:
 		/// <summary>
 		/// liefert die instanz des singletons
 		/// </summary>

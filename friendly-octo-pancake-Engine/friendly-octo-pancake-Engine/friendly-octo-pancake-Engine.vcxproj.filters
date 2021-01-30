@@ -15,10 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="friendly-octo-pancake-Engine.cpp">
+    <ClCompile Include="FrameWork\Logger_Import\loguru.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="FrameWork\Logger_Import\loguru.cpp">
+    <ClCompile Include="Quelle.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="FrameWork\modulLoader\moduleLoader.h">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,10 +38,13 @@
     <ClInclude Include="FrameWork\Singletons\baseSingleton.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="FrameWork\Singletons\baseSingletonStorrage.h">
+    <ClInclude Include="FrameWork\Singletons\baseSingletonFactory.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="FrameWork\Singletons\baseSingletonFactory.h">
+    <ClInclude Include="FrameWork\JsonParser\Json.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameWork\EntryPoint.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
