@@ -116,6 +116,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -151,6 +152,17 @@
     <ClInclude Include="FrameWork\Singletons\baseSingletonFactory.h" />
     <ClInclude Include="FrameWork\Singletons\baseSingleton.h" />
     <ClInclude Include="FrameWork\Tester.h" />
+    <ClInclude Include="Netzwerk\common.h" />
+    <ClInclude Include="Netzwerk\connection.h" />
+    <ClInclude Include="Netzwerk\INetzwerk.h" />
+    <ClInclude Include="Netzwerk\Message.h" />
+    <ClInclude Include="Netzwerk\Netzwerk.h" />
+    <ClInclude Include="Netzwerk\netzwerkInclude.h" />
+    <ClInclude Include="Netzwerk\NetzwerkKernal.h" />
+    <ClInclude Include="Netzwerk\net_client.h" />
+    <ClInclude Include="Netzwerk\net_server.h" />
+    <ClInclude Include="Netzwerk\olc_net.h" />
+    <ClInclude Include="Netzwerk\tsQueue.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
