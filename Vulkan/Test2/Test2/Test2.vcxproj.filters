@@ -23,4 +23,18 @@
     <None Include="VertexShader.vert" />
     <None Include="FragmentShader.frag" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NonDependingFunktions.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="EasyImage.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="DepthImage.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
