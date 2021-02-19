@@ -180,8 +180,13 @@
   <ItemGroup>
     <ClInclude Include="DepthImage.h" />
     <ClInclude Include="EasyImage.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="MeshHelper.h" />
     <ClInclude Include="NonDependingFunktions.h" />
+    <ClInclude Include="objLoader.h" />
+    <ClInclude Include="pipeline.h" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

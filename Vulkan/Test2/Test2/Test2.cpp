@@ -4,14 +4,19 @@
 
 #include "DepthImage.h"
 #include "EasyImage.h"
+#include "Vertex.h"
+#include "Mesh.h"
+#include "pipeline.h"
 #include "NonDependingFunktions.h"
+#include "MeshHelper.h"
 
 #include <chrono>
 
-#define ShowDebug
+//#define ShowDebug
 
 DepthImage depthImage;
-EasyImage testImage;
+EasyImage dirtTexture;
+EasyImage dirtNormals;
 
 VkInstance instance;
 VkDevice device;
@@ -22,8 +27,6 @@ VkImageView* imageViews;
 GLFWwindow *window;
 VkShaderModule vertShaderModul;
 VkShaderModule fragShaderModul;
-VkPipelineLayout pipelineLayout;
-VkPipeline pipeline;
 VkFramebuffer* framebuffers;
 VkRenderPass renderPass;
 VkCommandPool commandPool;
@@ -48,61 +51,20 @@ const VkFormat colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
 
 std::vector<VkPhysicalDevice> allPyhsikalDevices;
 
-class Vertex {
-public:
-	Vertex(glm::vec3 pos, glm::vec3 color, glm::vec2 uvCoord)
-		:pos(pos),color(color), uvCoord(uvCoord){}
-	glm::vec3 pos;
-	glm::vec3 color;
-	glm::vec2 uvCoord;
+Pipeline pipeline0;
+Pipeline pipeline1;
 
-	static VkVertexInputBindingDescription getBindingDescription(const uint32_t index = 0) {
-		VkVertexInputBindingDescription toRet;
+struct UBO {
+	glm::mat4 modle;
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::vec3 light;		//mehrere ermöglichen
 
-		toRet.binding = index;
-		toRet.stride = sizeof(Vertex);
-		toRet.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		return toRet;
-	}
-	static std::vector<VkVertexInputAttributeDescription> getAttributDescriptions(const uint32_t index = 0) {
-		std::vector<VkVertexInputAttributeDescription> toRet(3);
-
-		toRet[0].location = 0;
-		toRet[0].binding = index;
-		toRet[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		toRet[0].offset = offsetof(Vertex, pos);
-
-		toRet[1].location = 1;
-		toRet[1].binding = index;
-		toRet[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		toRet[1].offset = offsetof(Vertex, color);
-
-		toRet[2].location = 2;
-		toRet[2].binding = index;
-		toRet[2].format = VK_FORMAT_R32G32_SFLOAT;
-		toRet[2].offset = offsetof(Vertex, uvCoord);
-
-		return toRet;
-	}
 };
+UBO ubo0;
 
-std::vector<Vertex> verticies = {
-	Vertex({  0.5f, -0.5f, 0.0f}, { 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}),
-	Vertex({ -0.5f,  0.5f, 0.0f}, { 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}),
-	Vertex({ -0.5f, -0.5f, 0.0f}, { 1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}),
-	Vertex({  0.5f,  0.5f, 0.0f}, { 0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}),
-
-	Vertex({  0.5f, -0.5f, -0.5f}, { 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}),
-	Vertex({ -0.5f,  0.5f, -0.5f}, { 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}),
-	Vertex({ -0.5f, -0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}),
-	Vertex({  0.5f,  0.5f, -0.5f}, { 0.0f, 1.0f, 0.0f}, {1.0f, 0.0f})
-};
-
-std::vector<uint32_t> indices = {
-	2,0,3,2,3,1,
-	6,4,7,6,7,5
-};
+std::vector<Vertex> verticies;
+std::vector<uint32_t> indices;
 
 void CreateShaderModul(const std::vector<char> &code, VkShaderModule* shaderModule) {
 	VkShaderModuleCreateInfo shaderCreateInfo;
@@ -250,6 +212,7 @@ void createDevice() {
 
 	VkPhysicalDeviceFeatures usedFeatures = {}; //hier features enablen
 	usedFeatures.samplerAnisotropy = VK_TRUE;
+	usedFeatures.fillModeNonSolid = VK_TRUE;
 
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -400,9 +363,14 @@ void createDescriptorSetLayout() {
 	samplerDInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	samplerDInfo.pImmutableSamplers = nullptr;
 
-	std::vector< VkDescriptorSetLayoutBinding> layoutBinding;
-	layoutBinding.push_back(desLayoutBinding);
-	layoutBinding.push_back(samplerDInfo);
+	VkDescriptorSetLayoutBinding samplerNormalInfo;
+	samplerNormalInfo.binding = 2;							//in shader
+	samplerNormalInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerNormalInfo.descriptorCount = 1;
+	samplerNormalInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	samplerNormalInfo.pImmutableSamplers = nullptr;
+
+	std::vector< VkDescriptorSetLayoutBinding> layoutBinding = { desLayoutBinding , samplerDInfo , samplerNormalInfo };
 
 	VkDescriptorSetLayoutCreateInfo desSetLayoutCreateInfo;
 	desSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -421,166 +389,11 @@ void createRenderPipeline() {
 	CreateShaderModul(vertShaderCode, &vertShaderModul);
 	CreateShaderModul(fragShader, &fragShaderModul);
 
-	VkPipelineShaderStageCreateInfo vertShaderCreateInfo;
-	vertShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderCreateInfo.pNext = nullptr;
-	vertShaderCreateInfo.flags = 0;
-	vertShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderCreateInfo.module = vertShaderModul;
-	vertShaderCreateInfo.pName = "main";				//startpunkt in shader
-	vertShaderCreateInfo.pSpecializationInfo = nullptr;	//constanten in shader setzen
-
-	VkPipelineShaderStageCreateInfo fragShaderCreateInfo;
-	fragShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderCreateInfo.pNext = nullptr;
-	fragShaderCreateInfo.flags = 0;
-	fragShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderCreateInfo.module = fragShaderModul;
-	fragShaderCreateInfo.pName = "main";				//startpunkt in shader
-	fragShaderCreateInfo.pSpecializationInfo = nullptr;	//constanten in shader setzen
-
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderCreateInfo ,fragShaderCreateInfo };
-
-	auto vertexBindingDescriptions = Vertex::getBindingDescription();
-	auto vertexAtributDescriptions = Vertex::getAttributDescriptions();
-
-	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo;
-	vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputCreateInfo.pNext = nullptr;
-	vertexInputCreateInfo.flags = 0;
-	vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-	vertexInputCreateInfo.pVertexBindingDescriptions = &vertexBindingDescriptions;		//platz pro vertex //per vertex oder per instanz		//mesh instanzing
-	vertexInputCreateInfo.vertexAttributeDescriptionCount = vertexAtributDescriptions.size();
-	vertexInputCreateInfo.pVertexAttributeDescriptions = vertexAtributDescriptions.data();
-
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo;
-	inputAssemblyCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyCreateInfo.pNext = nullptr;
-	inputAssemblyCreateInfo.flags = 0;
-	inputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;	//liste an dreieck
-	inputAssemblyCreateInfo.primitiveRestartEnable = VK_FALSE;				//restart des zeichnens
-
-	//mehrere render ziehle
-	VkViewport viewport;
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = screenWidth;
-	viewport.height = screenHeight;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	//kann elemente des screens wegschneiden alles was nicht drin ist wird weg geschnitten
-	VkRect2D scissore;
-	scissore.offset.x = 0;
-	scissore.offset.y = 0;
-	scissore.extent.width = screenWidth;
-	scissore.extent.height = screenHeight;
-
-	VkPipelineViewportStateCreateInfo viewportStateCreateInfo;
-	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportStateCreateInfo.pNext = nullptr;
-	viewportStateCreateInfo.flags = 0;
-	viewportStateCreateInfo.viewportCount = 1;
-	viewportStateCreateInfo.pViewports = &viewport;	//array
-	viewportStateCreateInfo.scissorCount = 1;
-	viewportStateCreateInfo.pScissors = &scissore;	//array
-
-	VkPipelineRasterizationStateCreateInfo rasterisationCreateInfo;
-	rasterisationCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterisationCreateInfo.pNext = nullptr;
-	rasterisationCreateInfo.flags = 0;
-	rasterisationCreateInfo.depthClampEnable = VK_FALSE;
-	rasterisationCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-	rasterisationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;		//wiremesh mit line  VK_POLYGON_MODE_LINE	//fehler noch lösen
-	rasterisationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterisationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterisationCreateInfo.depthBiasEnable = VK_FALSE;
-	rasterisationCreateInfo.depthBiasConstantFactor = 0.0f;
-	rasterisationCreateInfo.depthBiasClamp = 0.0f;
-	rasterisationCreateInfo.depthBiasSlopeFactor = 0.0f;
-	rasterisationCreateInfo.lineWidth = 1.0f;
-
-	VkPipelineMultisampleStateCreateInfo multisamplerCreateInfo;
-	multisamplerCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisamplerCreateInfo.pNext = nullptr;
-	multisamplerCreateInfo.flags = 0;
-	multisamplerCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;		//AAx1
-	multisamplerCreateInfo.sampleShadingEnable = VK_FALSE;						//AA aus
-	multisamplerCreateInfo.minSampleShading = 1.0f;
-	multisamplerCreateInfo.pSampleMask = nullptr;
-	multisamplerCreateInfo.alphaToCoverageEnable = VK_TRUE;
-	multisamplerCreateInfo.alphaToOneEnable = VK_FALSE;
-
-	VkPipelineColorBlendAttachmentState colorBlendAttachmend;
-	colorBlendAttachmend.blendEnable = VK_TRUE;
-	colorBlendAttachmend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	colorBlendAttachmend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	colorBlendAttachmend.colorBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachmend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachmend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachmend.alphaBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachmend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-	VkPipelineDepthStencilStateCreateInfo depthStencileStateCreateInfo = DepthImage::getDepthStencilStateCreateInfoOpaque();
-
-	VkPipelineColorBlendStateCreateInfo colorBlendCreateInfo;
-	colorBlendCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlendCreateInfo.pNext = nullptr;
-	colorBlendCreateInfo.flags = 0;
-	colorBlendCreateInfo.logicOpEnable = VK_FALSE;
-	colorBlendCreateInfo.logicOp = VK_LOGIC_OP_NO_OP;
-	colorBlendCreateInfo.attachmentCount = 1;
-	colorBlendCreateInfo.pAttachments = &colorBlendAttachmend;
-	colorBlendCreateInfo.blendConstants[0] = 0.0f;
-	colorBlendCreateInfo.blendConstants[1] = 0.0f;
-	colorBlendCreateInfo.blendConstants[2] = 0.0f;
-	colorBlendCreateInfo.blendConstants[3] = 0.0f;
-
-	VkDynamicState dynamicStates[] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR
-	};
-
-	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo;
-	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicStateCreateInfo.pNext = nullptr;
-	dynamicStateCreateInfo.flags = 0;
-	dynamicStateCreateInfo.dynamicStateCount = 2;
-	dynamicStateCreateInfo.pDynamicStates = dynamicStates;
-
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
-	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutCreateInfo.pNext = nullptr;
-	pipelineLayoutCreateInfo.flags = 0;
-	pipelineLayoutCreateInfo.setLayoutCount = 1;
-	pipelineLayoutCreateInfo.pSetLayouts = &desLayout;
-	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-	pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
-
-	testErrorCode(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
-
-	VkGraphicsPipelineCreateInfo pipelineCreateInfo;
-	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineCreateInfo.pNext = nullptr;
-	pipelineCreateInfo.flags = 0;
-	pipelineCreateInfo.stageCount = 2;
-	pipelineCreateInfo.pStages = shaderStages;
-	pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
-	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyCreateInfo;
-	pipelineCreateInfo.pTessellationState = nullptr;
-	pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-	pipelineCreateInfo.pRasterizationState = &rasterisationCreateInfo;
-	pipelineCreateInfo.pMultisampleState = &multisamplerCreateInfo;
-	pipelineCreateInfo.pDepthStencilState = &depthStencileStateCreateInfo;
-	pipelineCreateInfo.pColorBlendState = &colorBlendCreateInfo;
-	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-	pipelineCreateInfo.layout = pipelineLayout;
-	pipelineCreateInfo.renderPass = renderPass;
-	pipelineCreateInfo.subpass = 0;
-	pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;	//vererbungs pipeline //kürzer //switchen bei vererbung schneller
-	pipelineCreateInfo.basePipelineIndex = -1;
-
-	testErrorCode(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline));
+	pipeline0.init(vertShaderModul, fragShaderModul, screenWidth, screenHeight);
+	pipeline0.create(device, renderPass, desLayout);
+	pipeline1.init(vertShaderModul, fragShaderModul, screenWidth, screenHeight);
+	pipeline1.changePoligonMode(VK_POLYGON_MODE_LINE);
+	pipeline1.create(device, renderPass, desLayout);
 }
 
 void createFrameBuffers() {
@@ -635,12 +448,22 @@ void createCommandBuffers() {
 }
 
 void loadTexture() {
-	testImage.load("7.1.3.jpg");
-	testImage.upload(device, allPyhsikalDevices[0], commandPool, queue);
+	dirtTexture.load("151.jpg");
+	dirtTexture.upload(device, allPyhsikalDevices[0], commandPool, queue);
+	dirtNormals.load("151_norm.jpg");
+	dirtNormals.upload(device, allPyhsikalDevices[0], commandPool, queue);
+}
+
+void loadMesh() {
+	//dragonMesh.load("dragon.obj");
+	//verticies = dragonMesh.getVertecies();
+	//indices = dragonMesh.getIndices();
+	verticies = getQuadVertecies();
+	indices = getQuadIndicis();
 }
 
 void createUniformBuffer() {
-	VkDeviceSize bSize = sizeof(glm::mat4);
+	VkDeviceSize bSize = sizeof(UBO);
 	createBuffer(device, allPyhsikalDevices[0], bSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, uniformBuffer, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBufferMem);
 }
 
@@ -651,7 +474,7 @@ void createDescriptorPool() {
 
 	VkDescriptorPoolSize dSamplerSize;
 	dSamplerSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	dSamplerSize.descriptorCount = 1;
+	dSamplerSize.descriptorCount = 2;									//anzahl der texturen
 
 	std::vector< VkDescriptorPoolSize> poolSizeA;
 	poolSizeA.push_back(dSize);
@@ -681,7 +504,7 @@ void createDescriptorSet() {
 	VkDescriptorBufferInfo desBuffInfo;
 	desBuffInfo.buffer = uniformBuffer;
 	desBuffInfo.offset = 0;
-	desBuffInfo.range = sizeof(glm::mat4);
+	desBuffInfo.range = sizeof(UBO);
 
 	VkWriteDescriptorSet desWrite;
 	desWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -695,10 +518,17 @@ void createDescriptorSet() {
 	desWrite.pBufferInfo = &desBuffInfo;
 	desWrite.pTexelBufferView = nullptr;
 
-	VkDescriptorImageInfo samplerInfo;
-	samplerInfo.sampler = testImage.getSampler();
-	samplerInfo.imageView = testImage.getImageView();
-	samplerInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	VkDescriptorImageInfo samplerTextureInfo;
+	samplerTextureInfo.sampler = dirtTexture.getSampler();
+	samplerTextureInfo.imageView = dirtTexture.getImageView();
+	samplerTextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo samplerNormalInfo;
+	samplerNormalInfo.sampler = dirtNormals.getSampler();
+	samplerNormalInfo.imageView = dirtNormals.getImageView();
+	samplerNormalInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	std::vector<VkDescriptorImageInfo> samplerInfo = { samplerTextureInfo ,samplerNormalInfo };
 
 	VkWriteDescriptorSet desSamplerWrite;
 	desSamplerWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -706,9 +536,9 @@ void createDescriptorSet() {
 	desSamplerWrite.dstSet = desSet;
 	desSamplerWrite.dstBinding = 1;		//gegeben aus shader
 	desSamplerWrite.dstArrayElement = 0;
-	desSamplerWrite.descriptorCount = 1;
+	desSamplerWrite.descriptorCount = samplerInfo.size();
 	desSamplerWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	desSamplerWrite.pImageInfo = &samplerInfo;
+	desSamplerWrite.pImageInfo = samplerInfo.data();
 	desSamplerWrite.pBufferInfo = nullptr;
 	desSamplerWrite.pTexelBufferView = nullptr;
 
@@ -750,15 +580,20 @@ void recordCommandBuffers() {
 		testErrorCode(vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo));
 		renderPassBeginInfo.framebuffer = framebuffers[i];
 		vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		VkBool32 usePhong = true;
+		vkCmdPushConstants(commandBuffers[i], pipeline0.getLayout() , VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkBool32), &usePhong);
+
+		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline0.getPipeline());
 
 		VkViewport viewport;
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = screenWidth;
+		viewport.width = screenWidth/2;
 		viewport.height = screenHeight;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
+
 		vkCmdSetViewport(commandBuffers[i],0,1,&viewport);
 
 		VkRect2D scissor;
@@ -770,8 +605,23 @@ void recordCommandBuffers() {
 
 		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertexBuffer, offsets);
 		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &desSet, 0, nullptr);
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline0.getLayout(), 0, 1, &desSet, 0, nullptr);
 		vkCmdDrawIndexed(commandBuffers[i], indices.size(), 1, 0, 0, 0);
+
+
+		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline1.getPipeline());
+
+		viewport.x = screenWidth / 2;
+		vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
+
+		usePhong = false;
+		vkCmdPushConstants(commandBuffers[i], pipeline1.getLayout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkBool32), &usePhong);
+
+		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertexBuffer, offsets);
+		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline1.getLayout(), 0, 1, &desSet, 0, nullptr);
+		vkCmdDrawIndexed(commandBuffers[i], indices.size(), 1, 0, 0, 0);
+
 		vkCmdEndRenderPass(commandBuffers[i]);
 		testErrorCode(vkEndCommandBuffer(commandBuffers[i]));
 	}
@@ -810,6 +660,7 @@ void startVulkan() {
 	createFrameBuffers();
 	createCommandBuffers();
 	loadTexture();
+	loadMesh();
 	createBufferFromArrayToGraca(device, queue, allPyhsikalDevices[0], commandPool, verticies, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vertexBuffer, vertexBufferMem);
 	createBufferFromArrayToGraca(device, queue, allPyhsikalDevices[0], commandPool, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, indexBuffer, indexBufferMem);
 	createUniformBuffer();
@@ -887,25 +738,31 @@ void drawFrame() {
 	presendNextimage(imageIndex);
 }
 
-auto gameStartTime = std::chrono::high_resolution_clock::now();
 void updateMVP() {
 
+	static auto gameStartTime = std::chrono::high_resolution_clock::now();
 	auto frameTime = std::chrono::high_resolution_clock::now();
 
 	float timeSinceStart = std::chrono::duration_cast<std::chrono::milliseconds>(frameTime - gameStartTime).count() / 1000.0f;
 
-	glm::mat4 modle = glm::rotate(glm::mat4(1.0f), timeSinceStart * glm::radians(30.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::vec3 offset = glm::vec3(0.0f, 0.0f, 0.0f);
 
-	glm::mat4 view = glm::lookAt(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo0.modle = glm::mat4(1.0f);
+	ubo0.modle = glm::translate(ubo0.modle, glm::vec3(0.0f, 0.0f, 0.0f));
+	ubo0.modle = glm::translate(ubo0.modle, offset);
+	ubo0.modle = glm::scale(ubo0.modle, glm::vec3(1.0f, 1.0f, 1.0f));
+	ubo0.modle = glm::rotate(ubo0.modle, -timeSinceStart * glm::radians(30.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-	glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)screenWidth / (float)screenHeight, 0.01f, 10.0f);
-	projection[1][1] *= -1;
+	ubo0.view = glm::lookAt(glm::vec3(1.0f, 1.0f, 1.0f) + offset, glm::vec3(0.0f, 0.0f, 0.0f) + offset, glm::vec3(0.0f, 0.0f, 1.0f));
 
-	glm::mat4 MVP = projection * view * modle;
+	ubo0.light = glm::vec4(offset,0.0f) + glm::rotate(glm::mat4(1.0f), timeSinceStart * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::vec4(0.0f, 3.0f, 1.0f, 0.0f);
+
+	ubo0.proj = glm::perspective(glm::radians(60.0f), (float)screenWidth / (float)screenHeight * 0.5f, 0.01f, 100.0f);
+	ubo0.proj[1][1] *= -1;
 
 	void* data;
-	testErrorCode(vkMapMemory(device, uniformBufferMem, 0, sizeof(glm::mat4), 0, &data));
-	memcpy(data, &MVP, sizeof(glm::mat4));
+	testErrorCode(vkMapMemory(device, uniformBufferMem, 0, sizeof(UBO), 0, &data));
+	memcpy(data, &ubo0, sizeof(UBO));
 	vkUnmapMemory(device, uniformBufferMem);
 }
 
@@ -932,7 +789,8 @@ void shutDownVulkan() {
 	removeBuffer(device, vertexBuffer, vertexBufferMem);
 	removeBuffer(device, indexBuffer, indexBufferMem);
 
-	testImage.unload();
+	dirtTexture.unload();
+	dirtNormals.unload();
 
 	vkDestroySemaphore(device, semaphoreImgAvailable, nullptr);
 	vkDestroySemaphore(device, semaphoreImgRendered, nullptr);
@@ -942,9 +800,9 @@ void shutDownVulkan() {
 	for (int i = 0; i < imageViewsCount; i++)
 		vkDestroyFramebuffer(device, framebuffers[i], nullptr);
 	delete[] framebuffers;
-	vkDestroyPipeline(device, pipeline, nullptr);
 	vkDestroyRenderPass(device, renderPass, nullptr);
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	pipeline0.destroy();
+	pipeline1.destroy();
 	vkDestroyShaderModule(device, vertShaderModul, nullptr);
 	vkDestroyShaderModule(device, fragShaderModul, nullptr);
 	for (int i = 0; i < imageViewsCount; i++)

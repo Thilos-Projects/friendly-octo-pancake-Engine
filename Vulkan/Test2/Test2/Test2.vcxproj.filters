@@ -22,6 +22,7 @@
   <ItemGroup>
     <None Include="VertexShader.vert" />
     <None Include="FragmentShader.frag" />
+    <None Include="FragmentShader.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NonDependingFunktions.h">
@@ -34,6 +35,21 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="DepthImage.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="objLoader.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Vertex.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshHelper.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
