@@ -20,9 +20,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="VertexShader.vert" />
-    <None Include="FragmentShader.frag" />
-    <None Include="FragmentShader.frag" />
+    <None Include="Shader\FragmentShader.frag" />
+    <None Include="Shader\VertexShader.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NonDependingFunktions.h">
@@ -50,6 +49,12 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="MeshHelper.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

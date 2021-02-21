@@ -245,7 +245,7 @@ void createBufferFromArrayToGraca(VkDevice &device, VkQueue &queue, VkPhysicalDe
 	removeBuffer(device, sBuffer, sBufferMem);
 }
 
-std::vector<VkPhysicalDevice> getAllPhysikalDevices(VkInstance &instance) {
+std::vector<VkPhysicalDevice> getAllPhysikalDevices(VkInstance& instance) {
 	uint32_t physikalDeviceCount;
 	testErrorCode(vkEnumeratePhysicalDevices(instance, &physikalDeviceCount, nullptr));	//anzahl der grakas + fehler break
 

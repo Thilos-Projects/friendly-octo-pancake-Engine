@@ -7,12 +7,16 @@
 #include "Vertex.h"
 #include "Mesh.h"
 #include "pipeline.h"
+#include "Shader.h"
+#include "Renderer.h"
 #include "NonDependingFunktions.h"
 #include "MeshHelper.h"
 
+#include "Renderer.h"
+
 #include <chrono>
 
-//#define ShowDebug
+#define ShowDebug
 
 DepthImage depthImage;
 EasyImage dirtTexture;
@@ -25,10 +29,7 @@ VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 uint32_t imageViewsCount;
 VkImageView* imageViews;
 GLFWwindow *window;
-VkShaderModule vertShaderModul;
-VkShaderModule fragShaderModul;
 VkFramebuffer* framebuffers;
-VkRenderPass renderPass;
 VkCommandPool commandPool;
 VkCommandBuffer* commandBuffers;
 VkSemaphore semaphoreImgAvailable;
@@ -41,7 +42,6 @@ VkDeviceMemory indexBufferMem;
 VkBuffer uniformBuffer;
 VkDeviceMemory uniformBufferMem;
 
-VkDescriptorSetLayout desLayout;
 VkDescriptorPool desPool;
 VkDescriptorSet desSet;
 
@@ -51,8 +51,14 @@ const VkFormat colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
 
 std::vector<VkPhysicalDevice> allPyhsikalDevices;
 
+RenderPass renderPass;
+Renderer renderer;
+
 Pipeline pipeline0;
 Pipeline pipeline1;
+
+Shader vertShader;
+Shader fragShader;
 
 struct UBO {
 	glm::mat4 modle;
@@ -65,17 +71,6 @@ UBO ubo0;
 
 std::vector<Vertex> verticies;
 std::vector<uint32_t> indices;
-
-void CreateShaderModul(const std::vector<char> &code, VkShaderModule* shaderModule) {
-	VkShaderModuleCreateInfo shaderCreateInfo;
-	shaderCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	shaderCreateInfo.pNext = nullptr;
-	shaderCreateInfo.flags = 0;
-	shaderCreateInfo.codeSize = code.size();
-	shaderCreateInfo.pCode = (uint32_t*)code.data();
-
-	testErrorCode(vkCreateShaderModule(device, &shaderCreateInfo, nullptr, shaderModule));
-}
 
 void recreateSwapChain();
 
@@ -285,116 +280,6 @@ void createImageviews() {
 	delete[] swapchainImages;
 }
 
-void createRenderPass() {
-
-	VkAttachmentDescription attechmentDesription;
-	attechmentDesription.flags = 0;											//speicher überlappung möglich
-	attechmentDesription.format = colorFormat;
-	attechmentDesription.samples = VK_SAMPLE_COUNT_1_BIT;
-	attechmentDesription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;				//was pasiert mit werten nach dem laden
-	attechmentDesription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;			//was pasiert mit dem speichen
-	attechmentDesription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;		//fog of ware
-	attechmentDesription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attechmentDesription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			//format vor laden
-	attechmentDesription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;		//format nach laden
-
-	VkAttachmentReference attechmentRefference;
-	attechmentRefference.attachment = 0;
-	attechmentRefference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentDescription depthAttachment = DepthImage::getdepthAttachment(allPyhsikalDevices[0]);
-
-	VkAttachmentReference depthAttechmentRefference;
-	depthAttechmentRefference.attachment = 1;
-	depthAttechmentRefference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-
-	VkSubpassDescription subpassDescription;
-	subpassDescription.flags = 0;
-	subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpassDescription.inputAttachmentCount = 0;									//inputs
-	subpassDescription.pInputAttachments = nullptr;
-	subpassDescription.colorAttachmentCount = 1;
-	subpassDescription.pColorAttachments = &attechmentRefference;
-	subpassDescription.pResolveAttachments = nullptr;
-	subpassDescription.pDepthStencilAttachment = &depthAttechmentRefference;
-	subpassDescription.preserveAttachmentCount = 0;
-	subpassDescription.pPreserveAttachments = nullptr;
-
-	VkSubpassDependency subpassDependency;
-	subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	subpassDependency.dstSubpass = 0;
-	subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	subpassDependency.srcAccessMask = 0;
-	subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	subpassDependency.dependencyFlags = 0;
-
-	std::vector<VkAttachmentDescription> attachments;
-	attachments.push_back(attechmentDesription);
-	attachments.push_back(depthAttachment);
-
-	VkRenderPassCreateInfo renderPassCreateInfo;
-	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassCreateInfo.pNext = nullptr;
-	renderPassCreateInfo.flags = 0;
-	renderPassCreateInfo.attachmentCount = attachments.size();
-	renderPassCreateInfo.pAttachments = attachments.data();
-	renderPassCreateInfo.subpassCount = 1;
-	renderPassCreateInfo.pSubpasses = &subpassDescription;
-	renderPassCreateInfo.dependencyCount = 1;
-	renderPassCreateInfo.pDependencies = &subpassDependency;
-
-	testErrorCode(vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass));
-}
-
-void createDescriptorSetLayout() {
-	VkDescriptorSetLayoutBinding desLayoutBinding;
-	desLayoutBinding.binding = 0;							//in shader
-	desLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	desLayoutBinding.descriptorCount = 1;
-	desLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	desLayoutBinding.pImmutableSamplers = nullptr;
-
-	VkDescriptorSetLayoutBinding samplerDInfo;
-	samplerDInfo.binding = 1;								//in shader
-	samplerDInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerDInfo.descriptorCount = 1;
-	samplerDInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	samplerDInfo.pImmutableSamplers = nullptr;
-
-	VkDescriptorSetLayoutBinding samplerNormalInfo;
-	samplerNormalInfo.binding = 2;							//in shader
-	samplerNormalInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerNormalInfo.descriptorCount = 1;
-	samplerNormalInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	samplerNormalInfo.pImmutableSamplers = nullptr;
-
-	std::vector< VkDescriptorSetLayoutBinding> layoutBinding = { desLayoutBinding , samplerDInfo , samplerNormalInfo };
-
-	VkDescriptorSetLayoutCreateInfo desSetLayoutCreateInfo;
-	desSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	desSetLayoutCreateInfo.pNext = nullptr;
-	desSetLayoutCreateInfo.flags = 0;
-	desSetLayoutCreateInfo.bindingCount = layoutBinding.size();
-	desSetLayoutCreateInfo.pBindings = layoutBinding.data();
-
-	testErrorCode(vkCreateDescriptorSetLayout(device, &desSetLayoutCreateInfo, nullptr, &desLayout));
-}
-
-void createRenderPipeline() {
-	std::vector<char> vertShaderCode = readFile("vert.spv");
-	std::vector<char> fragShader = readFile("frag.spv");
-
-	CreateShaderModul(vertShaderCode, &vertShaderModul);
-	CreateShaderModul(fragShader, &fragShaderModul);
-
-	pipeline0.init(vertShaderModul, fragShaderModul, screenWidth, screenHeight);
-	pipeline0.create(device, renderPass, desLayout);
-	pipeline1.init(vertShaderModul, fragShaderModul, screenWidth, screenHeight);
-	pipeline1.changePoligonMode(VK_POLYGON_MODE_LINE);
-	pipeline1.create(device, renderPass, desLayout);
-}
 
 void createFrameBuffers() {
 	framebuffers = new VkFramebuffer[imageViewsCount];
@@ -403,7 +288,7 @@ void createFrameBuffers() {
 	framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	framebufferCreateInfo.pNext = nullptr;
 	framebufferCreateInfo.flags = 0;
-	framebufferCreateInfo.renderPass = renderPass;
+	framebufferCreateInfo.renderPass = renderPass.getRenderPass();
 	framebufferCreateInfo.width = screenWidth;
 	framebufferCreateInfo.height = screenHeight;
 	framebufferCreateInfo.layers = 1;
@@ -497,7 +382,7 @@ void createDescriptorSet() {
 	desSAllocInfo.pNext = nullptr;
 	desSAllocInfo.descriptorPool = desPool;
 	desSAllocInfo.descriptorSetCount = 1;
-	desSAllocInfo.pSetLayouts = &desLayout;
+	desSAllocInfo.pSetLayouts = &;
 
 	testErrorCode(vkAllocateDescriptorSets(device, &desSAllocInfo, &desSet));
 
@@ -559,7 +444,7 @@ void recordCommandBuffers() {
 	VkRenderPassBeginInfo renderPassBeginInfo;
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.pNext = nullptr;
-	renderPassBeginInfo.renderPass = renderPass;
+	renderPassBeginInfo.renderPass = renderPass.getRenderPass();
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.height = screenHeight;
@@ -649,12 +534,34 @@ void startVulkan() {
 #endif
 	checkSurfaceSuport();
 	createDevice();
+
 	initQueue();
 	createSwapchain();
 	createImageviews();
-	createRenderPass();
-	createDescriptorSetLayout();
-	createRenderPipeline();
+
+	renderer.addWindow(window, screenWidth, screenHeight);
+	renderer.addLayer("VK_LAYER_KHRONOS_validation");
+	auto renderPassId = renderer.addRenderPass(colorFormat);
+	renderer.setAppName("TEST");
+	renderer.Start();
+
+
+	vertShader.init("Shader/VertexShader.vert", VK_SHADER_STAGE_VERTEX_BIT, "main");
+	fragShader.init("Shader/FragmentShader.frag", VK_SHADER_STAGE_FRAGMENT_BIT, "main");
+
+	vertShader.create(device, nullptr);
+	fragShader.create(device, nullptr);
+
+	pipeline0.init(screenWidth, screenHeight);
+	pipeline0.addShader(&vertShader);
+	pipeline0.addShader(&fragShader);
+	pipeline0.create(device, renderPass.getRenderPass());
+	pipeline1.init(screenWidth, screenHeight);
+	pipeline1.addShader(&vertShader);
+	pipeline1.addShader(&fragShader);
+	pipeline1.changePoligonMode(VK_POLYGON_MODE_LINE);
+	pipeline1.create(device, renderPass.getRenderPass());
+
 	createCommandPool();
 	createDepthImage();
 	createFrameBuffers();
@@ -800,11 +707,11 @@ void shutDownVulkan() {
 	for (int i = 0; i < imageViewsCount; i++)
 		vkDestroyFramebuffer(device, framebuffers[i], nullptr);
 	delete[] framebuffers;
-	vkDestroyRenderPass(device, renderPass, nullptr);
+	renderPass.destroy();
 	pipeline0.destroy();
 	pipeline1.destroy();
-	vkDestroyShaderModule(device, vertShaderModul, nullptr);
-	vkDestroyShaderModule(device, fragShaderModul, nullptr);
+	vertShader.destroy();
+	fragShader.destroy();
 	for (int i = 0; i < imageViewsCount; i++)
 		vkDestroyImageView(device, imageViews[i], nullptr);
 	delete[] imageViews;

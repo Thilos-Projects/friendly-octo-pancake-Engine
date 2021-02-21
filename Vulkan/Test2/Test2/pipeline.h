@@ -3,12 +3,118 @@
 
 #include "Vertex.h"
 #include "DepthImage.h"
+#include "Shader.h"
 #include "NonDependingFunktions.h"
 #include <vector>
 #include <stdexcept>
 
+class RenderPass {
+private:
+	VkAttachmentDescription attechmentDesription;
+	VkAttachmentReference attechmentRefference;
+	VkAttachmentDescription depthAttachment;
+	VkAttachmentReference depthAttechmentRefference;
+	VkSubpassDescription subpassDescription;
+	VkSubpassDependency subpassDependency;
+	std::vector<VkAttachmentDescription> attachments;
+
+	VkRenderPass renderPass;
+
+	VkDevice device;
+
+	bool isInit = false;
+	bool isCreated = false;
+
+public:
+
+	void init(VkFormat colorFormat) {
+		attechmentDesription.flags = 0;											//speicher überlappung möglich
+		attechmentDesription.format = colorFormat;
+		attechmentDesription.samples = VK_SAMPLE_COUNT_1_BIT;
+		attechmentDesription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;				//was pasiert mit werten nach dem laden
+		attechmentDesription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;			//was pasiert mit dem speichen
+		attechmentDesription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;		//fog of ware
+		attechmentDesription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attechmentDesription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			//format vor laden
+		attechmentDesription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;		//format nach laden
+
+		attechmentRefference.attachment = 0;
+		attechmentRefference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		depthAttechmentRefference.attachment = 1;
+		depthAttechmentRefference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+
+		subpassDescription.flags = 0;
+		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpassDescription.inputAttachmentCount = 0;									//inputs
+		subpassDescription.pInputAttachments = nullptr;
+		subpassDescription.colorAttachmentCount = 1;
+		subpassDescription.pColorAttachments = &attechmentRefference;
+		subpassDescription.pResolveAttachments = nullptr;
+		subpassDescription.pDepthStencilAttachment = &depthAttechmentRefference;
+		subpassDescription.preserveAttachmentCount = 0;
+		subpassDescription.pPreserveAttachments = nullptr;
+
+		subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		subpassDependency.dstSubpass = 0;
+		subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		subpassDependency.srcAccessMask = 0;
+		subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		subpassDependency.dependencyFlags = 0;
+
+		attachments.push_back(attechmentDesription);
+
+
+		isInit = true;
+	};
+
+	void create(VkDevice device, VkPhysicalDevice physicalDevice) {
+		if (!isInit)
+			throw std::logic_error("is not init");
+		if (isCreated)
+			throw std::logic_error("is already created");
+
+		this->device = device;
+
+		attachments.push_back(DepthImage::getdepthAttachment(physicalDevice));
+
+		VkRenderPassCreateInfo renderPassCreateInfo;
+		renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		renderPassCreateInfo.pNext = nullptr;
+		renderPassCreateInfo.flags = 0;
+		renderPassCreateInfo.attachmentCount = attachments.size();
+		renderPassCreateInfo.pAttachments = attachments.data();
+		renderPassCreateInfo.subpassCount = 1;
+		renderPassCreateInfo.pSubpasses = &subpassDescription;
+		renderPassCreateInfo.dependencyCount = 1;
+		renderPassCreateInfo.pDependencies = &subpassDependency;
+
+		testErrorCode(vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass));
+
+		isCreated = true;
+	};
+
+	void destroy() {
+		if(isCreated)
+			vkDestroyRenderPass(device, renderPass, nullptr);
+		device = VK_NULL_HANDLE;
+		isCreated = false;
+	};
+
+	VkRenderPass getRenderPass() {
+		if (!isCreated)
+			throw std::logic_error("is not created");
+
+		return renderPass;
+	}
+
+};
+
 class Pipeline {
 private:
+	std::vector<Shader*> shaderModules;
 	std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 	VkVertexInputBindingDescription vertexBindingDescriptions;
 	std::vector<VkVertexInputAttributeDescription> vertexAtributDescriptions;
@@ -24,18 +130,46 @@ private:
 	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo;
 	VkPushConstantRange pushConstRange;
 
-	VkViewport viewport;
-	VkRect2D scissore;
+	std::vector<VkViewport> viewports;
+	std::vector<VkRect2D> scissores;
 
 	VkPipeline pipeline = VK_NULL_HANDLE;
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-
+	VkDescriptorSetLayout layout = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
 
 	bool isInit = false;
 	bool isCreated = false;
 
 	VkAllocationCallbacks* allucationCallback;
+
+	void createShaderStageCreateInfo() {
+		shaderStages.clear();
+		for (int i = 0; i < shaderModules.size(); i++) {
+			shaderStages.push_back(shaderModules[i]->getShaderStageCreateInfo());
+		}
+	}
+
+	void createDescriptorLayout() {
+		std::vector< VkDescriptorSetLayoutBinding> layoutBinding;
+
+		for (int i = 0; i < shaderModules.size(); i++) {
+			auto temp = shaderModules[i]->getLayoutBindings();
+
+			for (int j = 0; j < temp.size(); j++) {
+				layoutBinding.push_back(temp[j]);
+			}
+		}
+
+		VkDescriptorSetLayoutCreateInfo desSetLayoutCreateInfo;
+		desSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		desSetLayoutCreateInfo.pNext = nullptr;
+		desSetLayoutCreateInfo.flags = 0;
+		desSetLayoutCreateInfo.bindingCount = layoutBinding.size();
+		desSetLayoutCreateInfo.pBindings = layoutBinding.data();
+
+		testErrorCode(vkCreateDescriptorSetLayout(device, &desSetLayoutCreateInfo, nullptr, &layout));
+	}
 
 public:
 	Pipeline(VkAllocationCallbacks* allucationCallback = nullptr) {this->allucationCallback = allucationCallback;};
@@ -45,28 +179,61 @@ public:
 	Pipeline& operator=(const Pipeline&) = delete;
 	Pipeline& operator=(Pipeline&&) = delete;
 
-	void addShaderStage(VkShaderStageFlagBits stageFlag, const char* mainName, VkShaderModule shaderModul, VkSpecializationInfo* specialisationInfo = nullptr) {
-
-		shaderStages.push_back(VkPipelineShaderStageCreateInfo());
-		VkPipelineShaderStageCreateInfo* vertShaderCreateInfo = &shaderStages[shaderStages.size() - 1];
-		vertShaderCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		vertShaderCreateInfo->pNext = nullptr;
-		vertShaderCreateInfo->flags = 0;
-		vertShaderCreateInfo->stage = stageFlag;
-		vertShaderCreateInfo->module = shaderModul;
-		vertShaderCreateInfo->pName = mainName;					//startpunkt in shader
-		vertShaderCreateInfo->pSpecializationInfo = nullptr;	//constanten in shader setzen
+	void addShader(Shader* sh) {
+		shaderModules.push_back(sh);
 	}
 
 	void changePoligonMode(VkPolygonMode poligonMode) {
 		rasterisationCreateInfo.polygonMode = poligonMode;
 	}
 
-	void init(VkShaderModule vertexShader, VkShaderModule fragmentShader, uint32_t width, uint32_t height) 
-	{
-		addShaderStage(VK_SHADER_STAGE_VERTEX_BIT, "main", vertexShader);
-		addShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, "main", fragmentShader);
+	void changeCullMode(VkCullModeFlags cullMode) {
+		rasterisationCreateInfo.cullMode = cullMode;
+	}
 
+	void changeFrontFaceIndication(VkFrontFace frontFaceIndication) {
+		rasterisationCreateInfo.frontFace = frontFaceIndication;
+	}
+
+	void addViewports(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float minDepth, float maxDepth) {
+		viewports.push_back(VkViewport());
+		VkViewport* viewport = &(viewports[viewports.size() - 1]);
+		viewport->x = x;
+		viewport->y = y;
+		viewport->width = width;
+		viewport->height = height;
+		viewport->minDepth = minDepth;
+		viewport->maxDepth = maxDepth;
+	};
+
+	void addScissores(uint32_t xOffset, uint32_t yOffset, uint32_t width, uint32_t height) {
+		scissores.push_back(VkRect2D());
+		VkRect2D* scissore = &(scissores[scissores.size() - 1]);
+		scissore->extent = {width,height};
+		scissore->offset = { (int32_t)xOffset, (int32_t)yOffset };
+	};
+
+	void resetViewports() {
+		viewports.clear();
+	};
+
+	void resetScissores() {
+		scissores.clear();
+	};
+
+	void setViewportsAndScissores() {
+		viewportStateCreateInfo.viewportCount = viewports.size();
+		viewportStateCreateInfo.pViewports = viewports.data();	//array
+		viewportStateCreateInfo.scissorCount = scissores.size();
+		viewportStateCreateInfo.pScissors = scissores.data();	//array
+	}
+
+	void setVertexTypologie(VkPrimitiveTopology topologie) {
+		inputAssemblyCreateInfo.topology = topologie;	//liste an dreieck
+	}
+
+	void init(uint32_t width, uint32_t height) 
+	{
 		vertexBindingDescriptions = Vertex::getBindingDescription();
 		vertexAtributDescriptions = Vertex::getAttributDescriptions();
 
@@ -81,39 +248,30 @@ public:
 		inputAssemblyCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		inputAssemblyCreateInfo.pNext = nullptr;
 		inputAssemblyCreateInfo.flags = 0;
-		inputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;	//liste an dreieck
 		inputAssemblyCreateInfo.primitiveRestartEnable = VK_FALSE;				//restart des zeichnens
 
-		//mehrere render ziehle
-		viewport.x = 0.0f;
-		viewport.y = 0.0f;
-		viewport.width = width;
-		viewport.height = height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-
-		//kann elemente des screens wegschneiden alles was nicht drin ist wird weg geschnitten
-		scissore.offset.x = 0;
-		scissore.offset.y = 0;
-		scissore.extent.width = width;
-		scissore.extent.height = height;
+		setVertexTypologie(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 		viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 		viewportStateCreateInfo.pNext = nullptr;
 		viewportStateCreateInfo.flags = 0;
-		viewportStateCreateInfo.viewportCount = 1;
-		viewportStateCreateInfo.pViewports = &viewport;	//array
-		viewportStateCreateInfo.scissorCount = 1;
-		viewportStateCreateInfo.pScissors = &scissore;	//array
+
+		resetViewports();
+		resetScissores();
+
+		addViewports(0, 0, width, height, 0, 1);
+		addScissores(0, 0, width, height);
+
+		setViewportsAndScissores();
 
 		rasterisationCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 		rasterisationCreateInfo.pNext = nullptr;
 		rasterisationCreateInfo.flags = 0;
 		rasterisationCreateInfo.depthClampEnable = VK_FALSE;
 		rasterisationCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-		rasterisationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;		//wiremesh mit line  VK_POLYGON_MODE_LINE	//fehler noch lösen
-		rasterisationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-		rasterisationCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		changePoligonMode(VK_POLYGON_MODE_FILL);
+		changeCullMode(VK_CULL_MODE_BACK_BIT);
+		changeFrontFaceIndication(VK_FRONT_FACE_CLOCKWISE);
 		rasterisationCreateInfo.depthBiasEnable = VK_FALSE;
 		rasterisationCreateInfo.depthBiasConstantFactor = 0.0f;
 		rasterisationCreateInfo.depthBiasClamp = 0.0f;
@@ -169,8 +327,7 @@ public:
 		pushConstRange.size = sizeof(VkBool32);
 		isInit = true;
 	};
-	
-	void create(VkDevice device, VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout) 
+	void create(VkDevice device, VkRenderPass renderPass) 
 	{
 		if (!isInit)
 			throw std::logic_error("call init First");
@@ -179,12 +336,15 @@ public:
 
 		this->device = device;
 
+		createShaderStageCreateInfo();
+		createDescriptorLayout();
+
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
 		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutCreateInfo.pNext = nullptr;
 		pipelineLayoutCreateInfo.flags = 0;
 		pipelineLayoutCreateInfo.setLayoutCount = 1;
-		pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+		pipelineLayoutCreateInfo.pSetLayouts = &layout;
 		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstRange;
 
