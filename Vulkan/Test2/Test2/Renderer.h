@@ -314,6 +314,7 @@ private:
 	VkShaderModule shaderModule;
 	std::vector<VkDescriptorSetLayoutBinding> descriptorLayoutBindings;
 	std::vector<std::pair<uint32_t, std::pair<uint32_t, uint32_t>>> descriptorUinformWriteInfos;
+	std::vector<std::pair<uint32_t, std::pair<uint32_t, uint32_t>>> descriptorUinformDynamicWriteInfos;
 	std::vector<std::pair<uint32_t, uint32_t>> descriptorsamplerWriteInfos;
 
 	std::vector<char> shaderCodeSpv;
@@ -357,8 +358,16 @@ public:
 			else if (configuration.bindingConfiugurations[i].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
 				descriptorsamplerWriteInfos.push_back(std::make_pair(configuration.bindingConfiugurations[i].bindingId, configuration.bindingConfiugurations[i].multiuse));
 			}
+			else if (configuration.bindingConfiugurations[i].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
+				descriptorUinformDynamicWriteInfos.push_back(std::make_pair(configuration.bindingConfiugurations[i].bindingId, std::make_pair(configuration.bindingConfiugurations[i].multiuse, configuration.bindingConfiugurations[i].buferIndex)));
+			}
+			else if (configuration.bindingConfiugurations[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+				descriptorUinformDynamicWriteInfos.push_back(std::make_pair(configuration.bindingConfiugurations[i].bindingId, std::make_pair(configuration.bindingConfiugurations[i].multiuse, configuration.bindingConfiugurations[i].buferIndex)));
+			}
+
+
+			
 		}
-		//buildWriteDescriptorSets
 
 		isInit = true;
 	};
@@ -414,6 +423,11 @@ public:
 		if (!isInit)
 			throw std::logic_error("is not created");
 		return descriptorLayoutBindings;
+	}
+	std::vector<std::pair<uint32_t, std::pair<uint32_t, uint32_t>>> getUniformDynamicBindings() {
+		if (!isInit)
+			throw std::logic_error("is not created");
+		return descriptorUinformDynamicWriteInfos;
 	}
 	std::vector<std::pair<uint32_t, std::pair<uint32_t, uint32_t>>> getUniformBindings() {
 		if (!isInit)
@@ -662,7 +676,7 @@ class Buffer {
 public:
 	struct Configuration
 	{
-		VkBufferUsageFlagBits bufferusage;
+		VkBufferUsageFlags bufferusage;
 		uint64_t maxBufferSize;
 		uint32_t singleBufferSize;
 		bool isInGrakaMemory;
@@ -1031,7 +1045,7 @@ private:
 
 		vkGetDeviceQueue(device, 0, 0, &queue);
 
-		shaders.clear();						//muss hier leer sein
+		shaders.clear();
 		for (int i = 0; i < consturctionInfo.shaderConfigurations.size(); i++) {
 			shaders.push_back(Shader());
 			shaders[i].init(consturctionInfo.shaderConfigurations[i]);
@@ -1246,33 +1260,36 @@ private:
 		for (int i = 0; i < images.size(); i++)
 			images[i].upload(device, consturctionInfo.allucator, physicalDevice, commandPool, queue);
 
-		//dragonMesh.load("dragon.obj");
-		//verticies = dragonMesh.getVertecies();
-		//indices = dragonMesh.getIndices();
-		//verticies = getQuadVertecies();
-		//indices = getQuadIndicis();
-
 		for (int i = 0; i < buffers.size(); i++) {
 			buffers[i].Create(device, consturctionInfo.allucator, queue, physicalDevice, commandPool);
 			buffers[i].updateBuffer();
 		}
 
-		//createBufferFromArrayToGraca(device, queue, physicalDevice, commandPool, verticies, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vertexBuffer, vertexBufferMem);
-		//createBufferFromArrayToGraca(device, queue, physicalDevice, commandPool, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, indexBuffer, indexBufferMem);
+		VkDescriptorPoolSize dUSize;							//ToDo auf die anzahl der uniforms anpassen
+		dUSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		dUSize.descriptorCount = 1;
 
-		//VkDeviceSize bSize = sizeof(UBO);
-		//createBuffer(device, physicalDevice, bSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, uniformBuffer, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBufferMem);
+		VkDescriptorPoolSize dUDSize;							//ToDo auf die anzahl der storrages anpassen
+		dUDSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		dUDSize.descriptorCount = 1;
 
-		VkDescriptorPoolSize dSize;
-		dSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		dSize.descriptorCount = 1;
+		VkDescriptorPoolSize dSSize;							//ToDo auf die anzahl der storrages anpassen
+		dSSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		dSSize.descriptorCount = 1;
 
-		VkDescriptorPoolSize dSamplerSize;
+		VkDescriptorPoolSize dSDSize;							//ToDo auf die anzahl der storrages anpassen
+		dSDSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		dSDSize.descriptorCount = 1;
+
+		VkDescriptorPoolSize dSamplerSize;						//ToDo auf die anzahl der images anpassen
 		dSamplerSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		dSamplerSize.descriptorCount = 2;									//anzahl der texturen
 
 		std::vector< VkDescriptorPoolSize> poolSizeA;
-		poolSizeA.push_back(dSize);
+		poolSizeA.push_back(dUSize);
+		poolSizeA.push_back(dUDSize);
+		poolSizeA.push_back(dSSize);
+		poolSizeA.push_back(dSDSize);
 		poolSizeA.push_back(dSamplerSize);
 
 		VkDescriptorPoolCreateInfo dPollCreateInfo;
@@ -1304,12 +1321,16 @@ private:
 		VkDescriptorBufferInfo* dBI;
 		VkDescriptorImageInfo* dII;
 
-
 		for (int i = 0; i < shaders.size(); i++) {
 			auto allUniformInfos = shaders[i].getUniformBindings();
+			auto allUniformDynamicInfos = shaders[i].getUniformDynamicBindings();
 			auto allSamplerInfos = shaders[i].getSamplerBindings();
 
 			for (int i = 0; i < allUniformInfos.size(); i++) {
+				tempBufferInfo.push_back(VkDescriptorBufferInfo());
+				writeSet.push_back(VkWriteDescriptorSet());
+			}
+			for (int i = 0; i < allUniformDynamicInfos.size(); i++) {
 				tempBufferInfo.push_back(VkDescriptorBufferInfo());
 				writeSet.push_back(VkWriteDescriptorSet());
 			}
@@ -1325,6 +1346,7 @@ private:
 
 		for (int i = 0; i < shaders.size(); i++) {
 			auto allUniformInfos = shaders[i].getUniformBindings();
+			auto allUniformDynamicInfos = shaders[i].getUniformDynamicBindings();
 			auto allSamplerInfos = shaders[i].getSamplerBindings();
 
 			for (int i = 0; i < allUniformInfos.size(); i++) {
@@ -1344,6 +1366,27 @@ private:
 				wDS->dstArrayElement = 0;
 				wDS->descriptorCount = 1;
 				wDS->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				wDS->pImageInfo = nullptr;
+				wDS->pBufferInfo = dBI;
+				wDS->pTexelBufferView = nullptr;
+			}
+			for (int i = 0; i < allUniformDynamicInfos.size(); i++) {
+				dBI = &tempBufferInfo[uniformIndex];
+				wDS = &writeSet[writerIndex];
+				writerIndex++;
+				uniformIndex++;
+
+				dBI->buffer = *buffers[allUniformDynamicInfos[i].second.second].getBuffer();
+				dBI->offset = 0;
+				dBI->range = allUniformDynamicInfos[i].second.first;
+
+				wDS->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				wDS->pNext = nullptr;
+				wDS->dstSet = descriptorSet;
+				wDS->dstBinding = allUniformDynamicInfos[i].first;
+				wDS->dstArrayElement = 0;
+				wDS->descriptorCount = 1;
+				wDS->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 				wDS->pImageInfo = nullptr;
 				wDS->pBufferInfo = dBI;
 				wDS->pTexelBufferView = nullptr;
@@ -1435,28 +1478,12 @@ private:
 
 				vkCmdSetScissor(commandBuffers[i], 0, scissores.size(), scissores.data());
 
-				//consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].vertexBufferIndex
-				//consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].indexBufferIndex
 				vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, buffers[consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].vertexBufferIndex].getBuffer(), consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].vertexOffset.data());
 				vkCmdBindIndexBuffer(commandBuffers[i], *buffers[consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].indexBufferIndex].getBuffer(), consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].indexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].pipelineIndex].getLayout(), 0, 1, &descriptorSet, 0, nullptr);
+				uint32_t offsets[] = {0};
+				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].pipelineIndex].getLayout(), 0, 1, &descriptorSet, 0, offsets);
 				vkCmdDrawIndexed(commandBuffers[i], buffers[consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].indexBufferIndex].getInSize(), consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].instanceCount, 0, 0, consturctionInfo.renderPassConfigurations[renderPassId].renderSessions[j].instanceOffset);
 			}
-
-			/*
-			vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline1.getPipeline());
-
-			viewport.x = consturctionInfo.screenWidth / 2;
-			vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
-
-			usePhong = false;
-			vkCmdPushConstants(commandBuffers[i], pipeline1.getLayout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkBool32), &usePhong);
-
-			vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertexBuffer, offsets);
-			vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline1.getLayout(), 0, 1, &descriptorSet, 0, nullptr);
-			vkCmdDrawIndexed(commandBuffers[i], indices.size(), 1, 0, 0, 0);
-			*/
 			vkCmdEndRenderPass(commandBuffers[i]);
 
 			testErrorCode(vkEndCommandBuffer(commandBuffers[i]));

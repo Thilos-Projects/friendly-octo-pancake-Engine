@@ -20,15 +20,18 @@ layout(location = 3) in vec3 inNormal;
 
 layout(binding = 0) uniform UBO
 {
-	mat4 M;
 	mat4 V;
 	mat4 P;
 	vec3 Light;						//mehrere Ermöglichen
 } ubo;
 
+layout(set = 0, binding = 1) buffer InstanceBuffer{
+	mat4[] instances;
+} instanceBuffer;
+
 void main(){
 
-	fragNormTransform = ubo.M;
+	fragNormTransform = instanceBuffer.instances[gl_InstanceIndex];
 	gl_Position = ubo.P * ubo.V * fragNormTransform * vec4(inPos,1.0);
 	vec4 worldPos = fragNormTransform * vec4(inPos,1.0);
 

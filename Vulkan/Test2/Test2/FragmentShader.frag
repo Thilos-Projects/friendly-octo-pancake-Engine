@@ -12,8 +12,8 @@ layout(location = 5) in mat4 fragNormTransform;
 
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 1) uniform sampler2D tex;
-layout(binding = 2) uniform sampler2D norms;
+layout(binding = 2) uniform sampler2D tex;
+layout(binding = 3) uniform sampler2D norms;
 
 layout(push_constant) uniform pushConstanten{
 	bool isPhong;
