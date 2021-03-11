@@ -20,11 +20,12 @@ layout(push_constant) uniform pushConstanten{
 }pushConst;
 
 void main(){
+
 	//outColor = vec4(fragColor,1.0);
 	//outColor = texture(tex,fragUV);
 	
-	vec3 texColor = texture(tex,fragUV).xyz;
-	vec3 texNormal = texture(norms,fragUV).xyz;
+	vec3 texColor ={1.0f,0.0f,0.0f};// texture(tex,fragUV).xyz;
+	vec3 texNormal = fragNormal;// texture(norms,fragUV).xyz;
 
 	vec3 N = normalize(texNormal);
 	vec3 L = normalize(fragLight);									//pro Licht
@@ -33,7 +34,7 @@ void main(){
 	vec3 R = reflect(-L, N);										//pro Licht
 
 	if(pushConst.isPhong){
-		vec3 A = texColor * 0.1;										//0.1 durch varriable ersetzen
+		vec3 A = texColor * 0.0;										//0.1 durch varriable ersetzen
 		vec3 D = max(dot(N, L) , 0.0) * texColor * 1;					//1 durch varriable ersetzen	//pro Licht
 		vec3 S = pow(max(dot(R, V), 0.0), 4) * vec3(0.3f);				//1.35 und 16 durch varriable ersetzen	//pro Licht
 
@@ -41,10 +42,10 @@ void main(){
 	}
 	else
 	{
-		if(pow(max(dot(R,V),0.0),5.0f) > 0.8){
+		if(pow(max(dot(R,V),0.0),5.0f) > 0.8 && false){
 			outColor = vec4(1.0);
 		}
-		else if(dot(V, N) < 0.25){
+		else if(dot(V, N) < 0.5){
 			outColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		}
 		else if(max(dot(N, L) , 0.0) >= 0.25){

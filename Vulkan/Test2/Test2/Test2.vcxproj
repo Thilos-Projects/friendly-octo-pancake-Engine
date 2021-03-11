@@ -178,21 +178,18 @@
     <ClCompile Include="Test2.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DepthImage.h" />
-    <ClInclude Include="EasyImage.h" />
+    <None Include="FragmentShader.frag" />
+    <None Include="VertexShader.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="glslReader.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshHelper.h" />
     <ClInclude Include="NonDependingFunktions.h" />
     <ClInclude Include="objLoader.h" />
-    <ClInclude Include="pipeline.h" />
     <ClInclude Include="Renderer.h" />
-    <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Vertex.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Shader\FragmentShader.frag" />
-    <None Include="Shader\VertexShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -10,97 +10,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-void printStats(VkPhysicalDevice & device, VkSurfaceKHR surface) {
-	VkPhysicalDeviceProperties properties;
-	vkGetPhysicalDeviceProperties(device, &properties);
-
-	VkPhysicalDeviceFeatures features;
-	vkGetPhysicalDeviceFeatures(device, &features);
-
-	VkPhysicalDeviceMemoryProperties memProp;
-	vkGetPhysicalDeviceMemoryProperties(device, &memProp);
-
-	uint32_t amountOfQueFamelies;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &amountOfQueFamelies, nullptr);
-
-	VkQueueFamilyProperties* familyProperties = new VkQueueFamilyProperties[amountOfQueFamelies];
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &amountOfQueFamelies, familyProperties);		//muss aufgerufen werden um die que family zu verwenden
-
-	VkSurfaceCapabilitiesKHR surfaceCapabilitiers;
-	testErrorCode(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &surfaceCapabilitiers));
-
-	uint32_t colorFormatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &colorFormatCount, nullptr);
-
-	VkSurfaceFormatKHR* surfaceFormats = new VkSurfaceFormatKHR[colorFormatCount];
-	testErrorCode(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &colorFormatCount, surfaceFormats));
-
-	uint32_t presentationModeCount;
-	testErrorCode(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentationModeCount, nullptr));
-
-	VkPresentModeKHR* presentationModes = new VkPresentModeKHR[presentationModeCount];
-	testErrorCode(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentationModeCount, presentationModes));
-
-	std::cout << "Name:            " << properties.deviceName << std::endl;
-	std::cout << "ApiVersion:      " << VK_VERSION_MAJOR(properties.apiVersion) << "." << VK_VERSION_MINOR(properties.apiVersion) << "." << VK_VERSION_PATCH(properties.apiVersion) << std::endl;
-	std::cout << "Treiber Version: " << properties.driverVersion << std::endl;
-	std::cout << "Vendor ID:       " << properties.vendorID << std::endl;
-	std::cout << "Device ID:       " << properties.deviceID << std::endl;
-	std::cout << "Device Type:     " << properties.deviceType << std::endl;
-	std::cout << "descrete Priorities: " << properties.limits.discreteQueuePriorities << std::endl;
-	std::cout << std::endl;
-
-
-	std::cout << "geometry Shader: " << features.geometryShader << std::endl;
-	std::cout << std::endl;
-
-	for (int i = 0; i < memProp.memoryHeapCount; i++)
-		std::cout << "Heap             " << i << " size:      " << memProp.memoryHeaps[i].size << std::endl;
-	for (int i = 0; i < memProp.memoryTypeCount; i++)
-		std::cout << "Type             " << i << " heapIndex: " << memProp.memoryTypes[i].heapIndex << " Flag: " << memProp.memoryTypes[i].propertyFlags << std::endl;
-	std::cout << std::endl;
-
-	std::cout << "quefamilieCount: " << amountOfQueFamelies << std::endl;
-
-	for (int i = 0; i < amountOfQueFamelies; i++) {
-		std::cout << "queFamily " << i << std::endl;
-		std::cout << "Que Graphics Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 ? "true" : "false") << std::endl;
-		std::cout << "Que Compute Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 ? "true" : "false") << std::endl;
-		std::cout << "Que Transfer Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 ? "true" : "false") << std::endl;
-		std::cout << "Que SparceBinding Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) != 0 ? "true" : "false") << std::endl;
-		std::cout << "Que Count: " << familyProperties[i].queueCount << std::endl;
-		std::cout << "Que TimeStamp vallide: " << familyProperties[i].timestampValidBits << std::endl;
-		std::cout << "Min Image Timastamp Granularyty: width: " << familyProperties[i].minImageTransferGranularity.width << " height: " << familyProperties[i].minImageTransferGranularity.height << " depth: " << familyProperties[i].minImageTransferGranularity.depth << std::endl << std::endl;
-	}
-
-	std::cout << "SurfaceCapabilities: " << std::endl;
-	std::cout << "\tminImgCount: " << surfaceCapabilitiers.minImageCount << std::endl;
-	std::cout << "\tmaxImgCount: " << surfaceCapabilitiers.maxImageCount << std::endl;
-	std::cout << "\tcurrent image Extend: " << surfaceCapabilitiers.currentExtent.width << "/" << surfaceCapabilitiers.currentExtent.height << std::endl;
-	std::cout << "\tmin image Extend: " << surfaceCapabilitiers.minImageExtent.width << "/" << surfaceCapabilitiers.minImageExtent.height << std::endl;
-	std::cout << "\tmax image Extend: " << surfaceCapabilitiers.maxImageExtent.width << "/" << surfaceCapabilitiers.maxImageExtent.height << std::endl;
-	std::cout << "\tmaxArrayLayers: " << surfaceCapabilitiers.maxImageArrayLayers << std::endl;
-	std::cout << "\tsuportedTransform: " << surfaceCapabilitiers.supportedTransforms << std::endl;
-	std::cout << "\tcurrentTransform: " << surfaceCapabilitiers.currentTransform << std::endl;
-	std::cout << "\tcomposit alpha: " << surfaceCapabilitiers.supportedCompositeAlpha << std::endl;
-	std::cout << "\tsoportedFlags: " << surfaceCapabilitiers.supportedUsageFlags << std::endl;
-
-
-	std::cout << "Anzahl der farbFormate: " << colorFormatCount << std::endl;
-	for (int i = 0; i < colorFormatCount; i++) {
-		std::cout << surfaceFormats[i].format << std::endl;
-	}
-
-	std::cout << "amount of presentation Modes: " << presentationModeCount << std::endl;
-	for (int i = 0; i < presentationModeCount; i++) {
-		std::cout << "mode: " << presentationModes[i] << std::endl;
-	}
-
-
-	delete[] presentationModes;
-	delete[] surfaceFormats;
-	delete[] familyProperties;
-}
 
 std::vector<char> readFile(const std::string& filename) {
 	std::ifstream file(filename, std::ios::binary | std::ios::ate);
@@ -203,7 +112,9 @@ void endRecordingSingleTimeBuffer(VkDevice& device, VkQueue& queue, VkCommandPoo
 	submitInfo.signalSemaphoreCount = 0;
 	submitInfo.pSignalSemaphores = nullptr;
 
-	testErrorCode(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+	VkResult temp = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+
+	testErrorCode(temp);
 
 	testErrorCode(vkQueueWaitIdle(queue));
 
@@ -225,7 +136,7 @@ void copyBuffer(VkDevice &device, VkQueue &queue, VkCommandPool &commandPool, Vk
 }
 
 template<typename T>
-void createBufferFromArrayToGraca(VkDevice &device, VkQueue &queue, VkPhysicalDevice &physikalDevice, VkCommandPool &commandPool, std::vector<T>& data, VkBufferUsageFlags usage, VkBuffer& buffer, VkDeviceMemory& bufferMem) {
+void createBufferFromArrayToGraca(VkDevice& device, VkQueue& queue, VkPhysicalDevice& physikalDevice, VkCommandPool& commandPool, std::vector<T>& data, VkBufferUsageFlags usage, VkBuffer& buffer, VkDeviceMemory& bufferMem) {
 	VkDeviceSize bSize = sizeof(T) * data.size();
 
 	VkBuffer sBuffer;
@@ -240,12 +151,29 @@ void createBufferFromArrayToGraca(VkDevice &device, VkQueue &queue, VkPhysicalDe
 
 	createBuffer(device, physikalDevice, bSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT, buffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferMem);
 
-	copyBuffer(device, queue,commandPool, sBuffer, buffer, bSize);
+	copyBuffer(device, queue, commandPool, sBuffer, buffer, bSize);
 
 	removeBuffer(device, sBuffer, sBufferMem);
 }
 
-std::vector<VkPhysicalDevice> getAllPhysikalDevices(VkInstance& instance) {
+void createBufferFromArrayToGraca(VkDevice& device, VkQueue& queue, VkPhysicalDevice& physikalDevice, VkCommandPool& commandPool, uint32_t *data, uint64_t dataSize, VkBufferUsageFlags usage, VkBuffer& buffer, VkDeviceMemory& bufferMem) {
+	VkBuffer sBuffer;
+	VkDeviceMemory sBufferMem;
+	createBuffer(device, physikalDevice, dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sBuffer, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sBufferMem);
+
+	void* rawData;
+	vkMapMemory(device, sBufferMem, 0, dataSize, 0, &rawData);
+	memcpy(rawData, data, dataSize);
+	vkUnmapMemory(device, sBufferMem);
+
+	createBuffer(device, physikalDevice, dataSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT, buffer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferMem);
+
+	copyBuffer(device, queue, commandPool, sBuffer, buffer, dataSize);
+
+	removeBuffer(device, sBuffer, sBufferMem);
+}
+
+std::vector<VkPhysicalDevice> getAllPhysikalDevices(VkInstance &instance) {
 	uint32_t physikalDeviceCount;
 	testErrorCode(vkEnumeratePhysicalDevices(instance, &physikalDeviceCount, nullptr));	//anzahl der grakas + fehler break
 
@@ -254,6 +182,160 @@ std::vector<VkPhysicalDevice> getAllPhysikalDevices(VkInstance& instance) {
 	testErrorCode(vkEnumeratePhysicalDevices(instance, &physikalDeviceCount, physikalDevices.data()));	//alle grakas holen + fehler break
 
 	return physikalDevices;
+}
+
+void printStats(VkPhysicalDevice& device, VkSurfaceKHR surface) {
+	VkPhysicalDeviceProperties properties;
+	vkGetPhysicalDeviceProperties(device, &properties);
+
+	VkPhysicalDeviceFeatures features;
+	vkGetPhysicalDeviceFeatures(device, &features);
+
+	VkPhysicalDeviceMemoryProperties memProp;
+	vkGetPhysicalDeviceMemoryProperties(device, &memProp);
+
+	uint32_t amountOfQueFamelies;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &amountOfQueFamelies, nullptr);
+
+	VkQueueFamilyProperties* familyProperties = new VkQueueFamilyProperties[amountOfQueFamelies];
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &amountOfQueFamelies, familyProperties);		//muss aufgerufen werden um die que family zu verwenden
+
+	VkSurfaceCapabilitiesKHR surfaceCapabilitiers;
+	testErrorCode(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &surfaceCapabilitiers));
+
+	uint32_t colorFormatCount;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &colorFormatCount, nullptr);
+
+	VkSurfaceFormatKHR* surfaceFormats = new VkSurfaceFormatKHR[colorFormatCount];
+	testErrorCode(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &colorFormatCount, surfaceFormats));
+
+	uint32_t presentationModeCount;
+	testErrorCode(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentationModeCount, nullptr));
+
+	VkPresentModeKHR* presentationModes = new VkPresentModeKHR[presentationModeCount];
+	testErrorCode(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentationModeCount, presentationModes));
+
+	std::cout << "Name:            " << properties.deviceName << std::endl;
+	std::cout << "ApiVersion:      " << VK_VERSION_MAJOR(properties.apiVersion) << "." << VK_VERSION_MINOR(properties.apiVersion) << "." << VK_VERSION_PATCH(properties.apiVersion) << std::endl;
+	std::cout << "Treiber Version: " << properties.driverVersion << std::endl;
+	std::cout << "Vendor ID:       " << properties.vendorID << std::endl;
+	std::cout << "Device ID:       " << properties.deviceID << std::endl;
+	std::cout << "Device Type:     " << properties.deviceType << std::endl;
+	std::cout << "descrete Priorities: " << properties.limits.discreteQueuePriorities << std::endl;
+	std::cout << std::endl;
+
+
+	std::cout << "geometry Shader: " << features.geometryShader << std::endl;
+	std::cout << std::endl;
+
+	for (int i = 0; i < memProp.memoryHeapCount; i++)
+		std::cout << "Heap             " << i << " size:      " << memProp.memoryHeaps[i].size << std::endl;
+	for (int i = 0; i < memProp.memoryTypeCount; i++)
+		std::cout << "Type             " << i << " heapIndex: " << memProp.memoryTypes[i].heapIndex << " Flag: " << memProp.memoryTypes[i].propertyFlags << std::endl;
+	std::cout << std::endl;
+
+	std::cout << "quefamilieCount: " << amountOfQueFamelies << std::endl;
+
+	for (int i = 0; i < amountOfQueFamelies; i++) {
+		std::cout << "queFamily " << i << std::endl;
+		std::cout << "Que Graphics Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 ? "true" : "false") << std::endl;
+		std::cout << "Que Compute Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 ? "true" : "false") << std::endl;
+		std::cout << "Que Transfer Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 ? "true" : "false") << std::endl;
+		std::cout << "Que SparceBinding Bit " << ((familyProperties[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) != 0 ? "true" : "false") << std::endl;
+		std::cout << "Que Count: " << familyProperties[i].queueCount << std::endl;
+		std::cout << "Que TimeStamp vallide: " << familyProperties[i].timestampValidBits << std::endl;
+		std::cout << "Min Image Timastamp Granularyty: width: " << familyProperties[i].minImageTransferGranularity.width << " height: " << familyProperties[i].minImageTransferGranularity.height << " depth: " << familyProperties[i].minImageTransferGranularity.depth << std::endl << std::endl;
+	}
+
+	std::cout << "SurfaceCapabilities: " << std::endl;
+	std::cout << "\tminImgCount: " << surfaceCapabilitiers.minImageCount << std::endl;
+	std::cout << "\tmaxImgCount: " << surfaceCapabilitiers.maxImageCount << std::endl;
+	std::cout << "\tcurrent image Extend: " << surfaceCapabilitiers.currentExtent.width << "/" << surfaceCapabilitiers.currentExtent.height << std::endl;
+	std::cout << "\tmin image Extend: " << surfaceCapabilitiers.minImageExtent.width << "/" << surfaceCapabilitiers.minImageExtent.height << std::endl;
+	std::cout << "\tmax image Extend: " << surfaceCapabilitiers.maxImageExtent.width << "/" << surfaceCapabilitiers.maxImageExtent.height << std::endl;
+	std::cout << "\tmaxArrayLayers: " << surfaceCapabilitiers.maxImageArrayLayers << std::endl;
+	std::cout << "\tsuportedTransform: " << surfaceCapabilitiers.supportedTransforms << std::endl;
+	std::cout << "\tcurrentTransform: " << surfaceCapabilitiers.currentTransform << std::endl;
+	std::cout << "\tcomposit alpha: " << surfaceCapabilitiers.supportedCompositeAlpha << std::endl;
+	std::cout << "\tsoportedFlags: " << surfaceCapabilitiers.supportedUsageFlags << std::endl;
+
+
+	std::cout << "Anzahl der farbFormate: " << colorFormatCount << std::endl;
+	for (int i = 0; i < colorFormatCount; i++) {
+		std::cout << surfaceFormats[i].format << std::endl;
+	}
+
+	std::cout << "amount of presentation Modes: " << presentationModeCount << std::endl;
+	for (int i = 0; i < presentationModeCount; i++) {
+		std::cout << "mode: " << presentationModes[i] << std::endl;
+	}
+
+
+	delete[] presentationModes;
+	delete[] surfaceFormats;
+	delete[] familyProperties;
+}
+
+void printExtensions() {
+	uint32_t ammountOfLayers;
+	testErrorCode(vkEnumerateInstanceLayerProperties(&ammountOfLayers, nullptr));
+
+	VkLayerProperties* layerProperties = new VkLayerProperties[ammountOfLayers];
+	testErrorCode(vkEnumerateInstanceLayerProperties(&ammountOfLayers, layerProperties));
+
+	std::cout << "ammount of instance Layers: " << ammountOfLayers << std::endl;
+
+	for (int i = 0; i < ammountOfLayers; i++) {
+		std::cout << "layer        " << i << std::endl;
+		std::cout << "Name:        " << layerProperties[i].layerName << std::endl;
+		std::cout << "SpecVersion: " << VK_VERSION_MAJOR(layerProperties[i].specVersion) << "." << VK_VERSION_MINOR(layerProperties[i].specVersion) << "." << VK_VERSION_PATCH(layerProperties[i].specVersion) << std::endl;
+		std::cout << "ImplVersion: " << VK_VERSION_MAJOR(layerProperties[i].implementationVersion) << "." << VK_VERSION_MINOR(layerProperties[i].implementationVersion) << "." << VK_VERSION_PATCH(layerProperties[i].implementationVersion) << std::endl;
+		std::cout << "Description: " << layerProperties[i].description << std::endl;
+
+		uint32_t ammountOfExtensions;
+		testErrorCode(vkEnumerateInstanceExtensionProperties(layerProperties[i].layerName, &ammountOfExtensions, nullptr));
+
+		VkExtensionProperties* extensionsProperties;
+		extensionsProperties = new VkExtensionProperties[ammountOfExtensions];
+		testErrorCode(vkEnumerateInstanceExtensionProperties(layerProperties[i].layerName, &ammountOfExtensions, extensionsProperties));
+
+		std::cout << "ammount of instance Extensions: " << ammountOfExtensions << std::endl;
+		for (int i = 0; i < ammountOfExtensions; i++) {
+			std::cout << "Name:        " << extensionsProperties[i].extensionName << std::endl;
+			std::cout << "SpecVersion: " << VK_VERSION_MAJOR(extensionsProperties[i].specVersion) << "." << VK_VERSION_MINOR(extensionsProperties[i].specVersion) << "." << VK_VERSION_PATCH(extensionsProperties[i].specVersion) << std::endl;
+			std::cout << std::endl;
+		}
+
+		std::cout << std::endl;
+		delete[] extensionsProperties;
+	}
+
+	uint32_t ammountOfExtensions;
+	testErrorCode(vkEnumerateInstanceExtensionProperties(nullptr, &ammountOfExtensions, nullptr));
+
+	VkExtensionProperties* extensionsProperties;
+	extensionsProperties = new VkExtensionProperties[ammountOfExtensions];
+	testErrorCode(vkEnumerateInstanceExtensionProperties(nullptr, &ammountOfExtensions, extensionsProperties));
+
+	std::cout << "ammount of instance Extensions: " << ammountOfExtensions << std::endl;
+	for (int i = 0; i < ammountOfExtensions; i++) {
+		std::cout << "Name:        " << extensionsProperties[i].extensionName << std::endl;
+		std::cout << "SpecVersion: " << VK_VERSION_MAJOR(extensionsProperties[i].specVersion) << "." << VK_VERSION_MINOR(extensionsProperties[i].specVersion) << "." << VK_VERSION_PATCH(extensionsProperties[i].specVersion) << std::endl;
+		std::cout << std::endl;
+	}
+
+	std::cout << std::endl;
+
+
+	delete[] extensionsProperties;
+	delete[] layerProperties;
+}
+
+void printAllPhysikalDevizes(VkInstance instance, VkSurfaceKHR surface) {
+	auto physikalDevices = getAllPhysikalDevices(instance);
+
+	for (uint32_t i = 0; i < physikalDevices.size(); i++)
+		printStats(physikalDevices[i], surface);
 }
 
 bool isStencilFormate(VkFormat format) {
