@@ -37,9 +37,6 @@
     <ClInclude Include="Mesh.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="MeshHelper.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Headerdateien\nonVulcan</Filter>
     </ClInclude>
@@ -47,9 +44,6 @@
       <Filter>Headerdateien\nonVulcan</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="glslReader.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

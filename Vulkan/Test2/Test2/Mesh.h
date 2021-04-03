@@ -51,7 +51,7 @@ public:
 					vertexAtributes.vertices[3 * index.vertex_index + 2],
 					vertexAtributes.vertices[3 * index.vertex_index + 1]
 				};
-				glm::vec3 color = 
+				/*glm::vec3 color = 
 				{
 					0.0f,	//vertexAtributes.colors[3 * index.vertex_index + 0],
 					1.0f,	//vertexAtributes.colors[3 * index.vertex_index + 1],
@@ -61,7 +61,7 @@ public:
 				{
 					0,	//vertexAtributes.texcoords[2 * index.vertex_index + 0],
 					0	//vertexAtributes.texcoords[2 * index.vertex_index + 1]
-				};
+				};*/
 				glm::vec3 normal =
 				{
 					vertexAtributes.normals[3 * index.normal_index + 0],
@@ -69,7 +69,7 @@ public:
 					vertexAtributes.normals[3 * index.normal_index + 1]
 				};
 
-				Vertex vert(pos, color, uvCoord, normal);
+				Vertex vert(pos/*, color, uvCoord*/, normal);
 
 				if (tempVertecies.count(vert) == 0) {
 					tempVertecies[vert] = tempVertecies.size();

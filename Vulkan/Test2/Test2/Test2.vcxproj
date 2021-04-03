@@ -182,9 +182,7 @@
     <None Include="VertexShader.vert" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="glslReader.h" />
     <ClInclude Include="Mesh.h" />
-    <ClInclude Include="MeshHelper.h" />
     <ClInclude Include="NonDependingFunktions.h" />
     <ClInclude Include="objLoader.h" />
     <ClInclude Include="Renderer.h" />

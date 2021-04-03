@@ -8,9 +8,6 @@
 #include "Vertex.h"
 #include "Mesh.h"
 #include "NonDependingFunktions.h"
-#include "MeshHelper.h"
-
-#include "glslReader.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -679,6 +676,7 @@ public:
 		VkBufferUsageFlags bufferusage;
 		uint64_t maxBufferSize;
 		uint32_t singleBufferSize;
+		uint32_t offset;
 		bool isInGrakaMemory;
 	};
 private:
@@ -786,26 +784,36 @@ public:
 		this->pointer = pointer;
 	}
 	void setData(void* data, uint64_t dataSize) {
-		uint64_t requiredSize = pointer + dataSize;
-		if (requiredSize > configuration.maxBufferSize * configuration.singleBufferSize)	throw std::logic_error("max size reached");
+		uint64_t requiredSize = pointer + dataSize + configuration.offset;
+		if (requiredSize > configuration.maxBufferSize * configuration.singleBufferSize + configuration.offset)	throw std::logic_error("max size reached");
+		dataChanged = true; 
+		if (requiredSize > savedData.size()) {
+			savedData.resize(requiredSize);
+			resizeNeeded = true;
+		}
+		memcpy(savedData.data() + pointer + configuration.offset, data, dataSize);
+		pointer += dataSize;
+	}
+	void setOffsetData(void* data, uint64_t dataSize, uint32_t offset) {
+		uint64_t requiredSize = dataSize + offset;
+		if (requiredSize > configuration.offset) throw std::logic_error("offset size overflow");
 		dataChanged = true;
 		if (requiredSize > savedData.size()) {
 			savedData.resize(requiredSize);
 			resizeNeeded = true;
 		}
-		memcpy(savedData.data() + pointer, data, dataSize);
-		pointer += dataSize;
+		memcpy(savedData.data() + offset, data, dataSize);
 	}
 	void clearDataAfterPointer() {
-		savedData.resize(pointer);
+		savedData.resize(pointer + configuration.offset);
 	}
 	void clearDataAfterPointer(uint64_t pointer) {
-		savedData.resize(pointer);
-		if (this->pointer = pointer) this->pointer = pointer;
+		savedData.resize(pointer + configuration.offset);
+		if (this->pointer != pointer) this->pointer = pointer;
 	}
 	void clearAllData() {
 		pointer = 0;
-		savedData.resize(0);
+		savedData.resize(configuration.offset);
 	}
 
 	bool updateBuffer() {
@@ -841,7 +849,7 @@ public:
 		return &buffer;
 	}
 	uint64_t getInSize() {
-		return savedData.size() / (float)configuration.singleBufferSize;
+		return (savedData.size() - configuration.offset) / (float)configuration.singleBufferSize;
 	}
 	uint64_t getOutSize() {
 		return savedData.size() * sizeof(uint32_t);
